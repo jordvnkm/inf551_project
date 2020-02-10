@@ -3,23 +3,8 @@ import csv
 import requests
 import sys
 
-# replaces values with appropriate values.
-def replaceVal(value):
-    if value == ', NULL, ':
-        return 'NULL'
-    return value.replace('\\"', "\\'")
-
 # returns a list of attributes.
-def parseRow(row):
-    rowStr = ",".join(row)
-    rowStr = rowStr[1:-1]
-    # value will be replaced back in replaceVal
-    rowStr = rowStr.replace("\\'", '\\"')
-    newrow = rowStr.split("'")
-    return [replaceVal(value) for value in newrow if (value != ', ')]
-
-# returns a list of attributes.
-def parseRow2(row):
+def parseRow0(row):
     rowStr = ",".join(row)
     index = 0 ;
     prev = None
@@ -51,40 +36,117 @@ def addRowToTableObjectList(values, columns, obj):
         insertObject[columns[index]] = values[index]
     obj.append(insertObject)
 
-def add_attributes_to_inverted_index(attributes, columns, inverted_index):
-    pass
+def transform_attribute_into_list(attribute):
+    attribute = attribute.lower()
+    attributes = attribute.split(" ")
+    return [''.join(char for char in string if char.isalnum()) for string in attributes]
+
+
+def add_attributes_to_inverted_index(attributes, columns, table, primary_key, inverted_index):
+    if len(attributes) != len(columns):
+        print(str(attributes) + "\n")
+        print(str(columns) + "\n")
+        print("attributes and columns do not match length\n")
+        return
+    
+    primary_key_value = None
+
+    for index in range(len(attributes)):
+        column = columns[index]
+        attribute = attributes[index]
+        if column == primary_key:
+            primary_key_value = attribute
+
+    for index in range(len(attributes)):
+        column = columns[index]
+        attribute = attributes[index]
+        modified_attribute_list = transform_attribute_into_list(attribute)
+        table_locations = None
+        for modified_attribute in modified_attribute_list:
+            # empty strings
+            if modified_attribute == '':
+                break;
+            if modified_attribute in inverted_index:
+                table_locations = inverted_index[modified_attribute]
+            else:
+                table_locations = []
+            location_in_table = {"TABLE": table, "COLUMN": column, "PRIMARY": primary_key, "PRIMARY_VALUE":primary_key_value}
+            table_locations.append(location_in_table)
+            inverted_index[modified_attribute] = table_locations
+
 
 def load_country(inverted_index):
-    csvfile = open('country.csv', 'r',  encoding="utf8")
+    csvfile = open('country.csv', 'r',  encoding="latin1")
     firebaseURL = "https://inf551-experimental.firebaseio.com/country.json"
     tablename = "country"
-    primaryKey = "Code"
+    primary_key = "Code"
   
     readCSV = csv.reader(csvfile, delimiter=',')
     columns = None
     tableObjectList = []
     for index, row in enumerate(readCSV):
         if index > 0:
-            #attributes = parseRow(row)
-            attributes = parseRow2(row)
-            add_attributes_to_inverted_index(attributes, columns, inverted_index) 
+            attributes = parseRow0(row)
+            add_attributes_to_inverted_index(attributes, columns, tablename, primary_key, inverted_index) 
             addRowToTableObjectList(attributes, columns, tableObjectList)
 
         else:
             rowStr = ",".join(row)
             newrow = rowStr.split(", ")
             columns = [''.join(e for e in string if e.isalnum()) for string in newrow]
+    
     x = requests.put(firebaseURL, data=json.dumps(tableObjectList))
     csvfile.close()
 
-def load_city():
-    pass
+def load_city(inverted_index):
+    csvfile = open('city.csv', 'r',  encoding="latin1")
+    firebaseURL = "https://inf551-experimental.firebaseio.com/city.json"
+    tablename = "city"
+    primary_key = "ID"
+  
+    readCSV = csv.reader(csvfile, delimiter=',')
+    columns = None
+    tableObjectList = []
+    for index, row in enumerate(readCSV):
+        if index > 0:
+            attributes = parseRow0(row)
+            add_attributes_to_inverted_index(attributes, columns, tablename, primary_key, inverted_index) 
+            addRowToTableObjectList(attributes, columns, tableObjectList)
+
+        else:
+            rowStr = ",".join(row)
+            newrow = rowStr.split(", ")
+            columns = [''.join(e for e in string if e.isalnum()) for string in newrow]
+    
+    x = requests.put(firebaseURL, data=json.dumps(tableObjectList))
+    csvfile.close()
 
 def load_countrylanguage(inverted_index):
-    pass
+    csvfile = open('countrylanguage.csv', 'r',  encoding="latin1")
+    firebaseURL = "https://inf551-experimental.firebaseio.com/countrylanguage.json"
+    tablename = "countrylanguage"
+    primary_key = "Language"
+  
+    readCSV = csv.reader(csvfile, delimiter=',')
+    columns = None
+    tableObjectList = []
+    for index, row in enumerate(readCSV):
+        if index > 0:
+            attributes = parseRow0(row)
+            add_attributes_to_inverted_index(attributes, columns, tablename, primary_key, inverted_index) 
+            addRowToTableObjectList(attributes, columns, tableObjectList)
+
+        else:
+            rowStr = ",".join(row)
+            newrow = rowStr.split(", ")
+            columns = [''.join(e for e in string if e.isalnum()) for string in newrow]
+    
+    x = requests.put(firebaseURL, data=json.dumps(tableObjectList))
+    csvfile.close()
 
 def upload_inverted_index(inverted_index):
-    pass
+    firebaseURL = "https://inf551-experimental.firebaseio.com/index.json"
+    x = requests.put(firebaseURL, data=json.dumps(inverted_index))
 
 
 def load_databases(args):
@@ -105,7 +167,7 @@ def load_databases(args):
 if __name__ == "__main__":
     load_databases(sys.argv)
 
-
+###################################################################### extras
 
 
 
@@ -129,3 +191,18 @@ def load_country2():
     #x = requests.put(firebaseURL, data=json.dumps(tableObjectList))
     txt.close()
     csvfile.close()
+
+# replaces values with appropriate values.
+def replaceVal(value):
+    if value == ', NULL, ':
+        return 'NULL'
+    return value.replace('\\"', "\\'")
+
+# returns a list of attributes.
+def parseRow(row):
+    rowStr = ",".join(row)
+    rowStr = rowStr[1:-1]
+    # value will be replaced back in replaceVal
+    rowStr = rowStr.replace("\\'", '\\"')
+    newrow = rowStr.split("'")
+    return [replaceVal(value) for value in newrow if (value != ', ')]
